@@ -6,12 +6,13 @@ import { DatabaseConnection } from '@/components/DatabaseConnection';
 import { TableList } from '@/components/TableList';
 import { TableView } from '@/components/TableView';
 import { QueryRunner } from '@/components/QueryRunner';
-import { Database, Table, Play } from 'lucide-react';
+import { DatabaseManager } from '@/components/DatabaseManager';
+import { Database, Table, Play, Settings } from 'lucide-react';
 
 export default function Home() {
   const { isConnected, tables, connectionConfig } = useSpacetimeDB();
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'tables' | 'query'>('tables');
+  const [activeTab, setActiveTab] = useState<'tables' | 'query' | 'manage'>('tables');
 
   if (!isConnected) {
     return (
@@ -80,6 +81,17 @@ export default function Home() {
               <Play className="w-4 h-4" />
               SQL Query
             </button>
+            <button
+              onClick={() => setActiveTab('manage')}
+              className={`flex items-center gap-2 px-6 py-3 border-b-2 transition-colors ${
+                activeTab === 'manage'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              <Settings className="w-4 h-4" />
+              Manage Databases
+            </button>
           </div>
         </div>
 
@@ -118,6 +130,12 @@ export default function Home() {
           {activeTab === 'query' && (
             <div className="col-span-12">
               <QueryRunner />
+            </div>
+          )}
+
+          {activeTab === 'manage' && (
+            <div className="col-span-12">
+              <DatabaseManager />
             </div>
           )}
         </div>

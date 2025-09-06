@@ -1,7 +1,7 @@
 export interface SpacetimeDBConfig {
   host: string;
   port: number;
-  database: string;
+  database?: string;
   token?: string;
 }
 
@@ -22,6 +22,26 @@ export interface QueryResult {
   data?: Record<string, unknown>[];
   error?: string;
   rowsAffected?: number;
+}
+
+export interface DatabaseInfo {
+  identity: string;
+  name: string;
+  owner_identity: string;
+  host_type: string;
+}
+
+export interface CreateDatabaseResult {
+  success: boolean;
+  database?: DatabaseInfo;
+  error?: string;
+}
+
+export interface PublishResult {
+  success: boolean;
+  database_identity?: string;
+  database_name?: string;
+  error?: string;
 }
 
 export class SpacetimeDBClient {
@@ -211,6 +231,124 @@ export class SpacetimeDBClient {
         success: false,
         error: error instanceof Error ? error.message : 'Delete failed'
       };
+    }
+  }
+
+  async listDatabases(): Promise<string[]> {
+    try {
+      const response = await this.makeRequest('/v1/databases');
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch databases: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.databases || [];
+    } catch (error) {
+      console.error('Failed to fetch databases:', error);
+      return [];
+    }
+  }
+
+  async createDatabase(name: string): Promise<CreateDatabaseResult> {
+    try {
+      const response = await this.makeRequest(`/v1/database/${name}`, {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          success: false,
+          error: `Failed to create database: ${response.statusText} - ${errorText}`
+        };
+      }
+
+      const result = await response.json();
+      return {
+        success: true,
+        database: {
+          identity: result.identity,
+          name: name,
+          owner_identity: result.owner_identity || '',
+          host_type: result.host_type || 'unknown'
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create database'
+      };
+    }
+  }
+
+  async publishModule(databaseName: string, wasmFile: File): Promise<PublishResult> {
+    try {
+      const formData = new FormData();
+      formData.append('wasm_module', wasmFile);
+
+      const response = await fetch(`${this.baseUrl}/v1/database/${databaseName}`, {
+        method: 'POST',
+        headers: {
+          ...(this.config.token && { 'Authorization': `Bearer ${this.config.token}` })
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          success: false,
+          error: `Failed to publish module: ${response.statusText} - ${errorText}`
+        };
+      }
+
+      const result = await response.json();
+      return {
+        success: true,
+        database_identity: result.identity,
+        database_name: databaseName
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to publish module'
+      };
+    }
+  }
+
+  async getDatabaseInfo(nameOrIdentity: string): Promise<DatabaseInfo | null> {
+    try {
+      const response = await this.makeRequest(`/v1/database/${nameOrIdentity}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch database info: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return {
+        identity: data.identity,
+        name: data.name || nameOrIdentity,
+        owner_identity: data.owner_identity || '',
+        host_type: data.host_type || 'unknown'
+      };
+    } catch (error) {
+      console.error('Failed to fetch database info:', error);
+      return null;
+    }
+  }
+
+  async deleteDatabase(nameOrIdentity: string): Promise<boolean> {
+    try {
+      const response = await this.makeRequest(`/v1/database/${nameOrIdentity}`, {
+        method: 'DELETE'
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('Failed to delete database:', error);
+      return false;
     }
   }
 }
