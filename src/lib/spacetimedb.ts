@@ -79,9 +79,14 @@ export class SpacetimeDBClient {
     }
   }
 
-  async getTables(): Promise<TableInfo[]> {
+  async getTables(databaseName?: string): Promise<TableInfo[]> {
+    const dbName = databaseName || this.config.database;
+    if (!dbName) {
+      throw new Error('Database name is required to fetch tables');
+    }
+
     try {
-      const response = await this.makeRequest(`/database/${this.config.database}/schema`);
+      const response = await this.makeRequest(`/database/${dbName}/schema`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch schema: ${response.statusText}`);
@@ -95,9 +100,17 @@ export class SpacetimeDBClient {
     }
   }
 
-  async query(sql: string): Promise<QueryResult> {
+  async query(sql: string, databaseName?: string): Promise<QueryResult> {
+    const dbName = databaseName || this.config.database;
+    if (!dbName) {
+      return {
+        success: false,
+        error: 'Database name is required to execute queries'
+      };
+    }
+
     try {
-      const response = await this.makeRequest(`/database/${this.config.database}/sql`, {
+      const response = await this.makeRequest(`/database/${dbName}/sql`, {
         method: 'POST',
         body: JSON.stringify({ query: sql })
       });
@@ -123,12 +136,20 @@ export class SpacetimeDBClient {
     }
   }
 
-  async getTableData(tableName: string, limit: number = 100, offset: number = 0): Promise<QueryResult> {
+  async getTableData(tableName: string, databaseName?: string, limit: number = 100, offset: number = 0): Promise<QueryResult> {
     const sql = `SELECT * FROM ${tableName} LIMIT ${limit} OFFSET ${offset}`;
-    return this.query(sql);
+    return this.query(sql, databaseName);
   }
 
-  async insertData(tableName: string, data: Record<string, unknown>): Promise<QueryResult> {
+  async insertData(tableName: string, data: Record<string, unknown>, databaseName?: string): Promise<QueryResult> {
+    const dbName = databaseName || this.config.database;
+    if (!dbName) {
+      return {
+        success: false,
+        error: 'Database name is required for insert operations'
+      };
+    }
+
     const columns = Object.keys(data);
     const values = Object.values(data);
     const placeholders = values.map(() => '?').join(', ');
@@ -136,7 +157,7 @@ export class SpacetimeDBClient {
     const sql = `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
     
     try {
-      const response = await this.makeRequest(`/database/${this.config.database}/sql`, {
+      const response = await this.makeRequest(`/database/${dbName}/sql`, {
         method: 'POST',
         body: JSON.stringify({ 
           query: sql,
@@ -164,7 +185,15 @@ export class SpacetimeDBClient {
     }
   }
 
-  async updateData(tableName: string, data: Record<string, unknown>, where: Record<string, unknown>): Promise<QueryResult> {
+  async updateData(tableName: string, data: Record<string, unknown>, where: Record<string, unknown>, databaseName?: string): Promise<QueryResult> {
+    const dbName = databaseName || this.config.database;
+    if (!dbName) {
+      return {
+        success: false,
+        error: 'Database name is required for update operations'
+      };
+    }
+
     const setPairs = Object.keys(data).map(key => `${key} = ?`);
     const wherePairs = Object.keys(where).map(key => `${key} = ?`);
     
@@ -172,7 +201,7 @@ export class SpacetimeDBClient {
     const params = [...Object.values(data), ...Object.values(where)];
 
     try {
-      const response = await this.makeRequest(`/database/${this.config.database}/sql`, {
+      const response = await this.makeRequest(`/database/${dbName}/sql`, {
         method: 'POST',
         body: JSON.stringify({ 
           query: sql,
@@ -200,13 +229,21 @@ export class SpacetimeDBClient {
     }
   }
 
-  async deleteData(tableName: string, where: Record<string, unknown>): Promise<QueryResult> {
+  async deleteData(tableName: string, where: Record<string, unknown>, databaseName?: string): Promise<QueryResult> {
+    const dbName = databaseName || this.config.database;
+    if (!dbName) {
+      return {
+        success: false,
+        error: 'Database name is required for delete operations'
+      };
+    }
+
     const wherePairs = Object.keys(where).map(key => `${key} = ?`);
     const sql = `DELETE FROM ${tableName} WHERE ${wherePairs.join(' AND ')}`;
     const params = Object.values(where);
 
     try {
-      const response = await this.makeRequest(`/database/${this.config.database}/sql`, {
+      const response = await this.makeRequest(`/database/${dbName}/sql`, {
         method: 'POST',
         body: JSON.stringify({ 
           query: sql,

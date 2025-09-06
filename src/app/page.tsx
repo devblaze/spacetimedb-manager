@@ -10,9 +10,9 @@ import { DatabaseManager } from '@/components/DatabaseManager';
 import { Database, Table, Play, Settings } from 'lucide-react';
 
 export default function Home() {
-  const { isConnected, tables, connectionConfig } = useSpacetimeDB();
+  const { isConnected, tables, connectionConfig, currentDatabase, availableDatabases, switchDatabase } = useSpacetimeDB();
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'tables' | 'query' | 'manage'>('tables');
+  const [activeTab, setActiveTab] = useState<'tables' | 'query' | 'manage'>('manage');
 
   if (!isConnected) {
     return (
@@ -50,9 +50,28 @@ export default function Home() {
               </div>
               <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300">
                 <span>Connected to {connectionConfig?.host}:{connectionConfig?.port}</span>
-                <span className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 rounded">
-                  {connectionConfig?.database}
-                </span>
+                {currentDatabase ? (
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 rounded">
+                      {currentDatabase}
+                    </span>
+                    <select
+                      value={currentDatabase}
+                      onChange={(e) => switchDatabase(e.target.value)}
+                      className="px-2 py-1 text-xs bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded"
+                    >
+                      {availableDatabases.map((db) => (
+                        <option key={db} value={db}>
+                          {db}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100 rounded">
+                    Server Connected ({availableDatabases.length} databases)
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -61,18 +80,20 @@ export default function Home() {
           <div className="flex">
             <button
               onClick={() => setActiveTab('tables')}
-              className={`flex items-center gap-2 px-6 py-3 border-b-2 transition-colors ${
+              disabled={!currentDatabase}
+              className={`flex items-center gap-2 px-6 py-3 border-b-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 activeTab === 'tables'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                   : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
               }`}
             >
               <Table className="w-4 h-4" />
-              Tables ({tables.length})
+              Tables ({currentDatabase ? tables.length : 0})
             </button>
             <button
               onClick={() => setActiveTab('query')}
-              className={`flex items-center gap-2 px-6 py-3 border-b-2 transition-colors ${
+              disabled={!currentDatabase}
+              className={`flex items-center gap-2 px-6 py-3 border-b-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 activeTab === 'query'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                   : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
@@ -97,7 +118,7 @@ export default function Home() {
 
         {/* Content */}
         <div className="grid grid-cols-12 gap-6">
-          {activeTab === 'tables' && (
+          {activeTab === 'tables' && currentDatabase && (
             <>
               {/* Sidebar */}
               <div className="col-span-4">
@@ -127,7 +148,7 @@ export default function Home() {
             </>
           )}
 
-          {activeTab === 'query' && (
+          {activeTab === 'query' && currentDatabase && (
             <div className="col-span-12">
               <QueryRunner />
             </div>
@@ -136,6 +157,44 @@ export default function Home() {
           {activeTab === 'manage' && (
             <div className="col-span-12">
               <DatabaseManager />
+            </div>
+          )}
+
+          {(activeTab === 'tables' || activeTab === 'query') && !currentDatabase && (
+            <div className="col-span-12">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-8 text-center">
+                <Database className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                  Select a Database
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  Choose a database to view tables and run queries, or create a new one in the Manage tab
+                </p>
+                {availableDatabases.length > 0 ? (
+                  <div className="flex flex-col items-center gap-4">
+                    <select
+                      onChange={(e) => e.target.value && switchDatabase(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:text-white"
+                      defaultValue=""
+                    >
+                      <option value="">Select a database...</option>
+                      {availableDatabases.map((db) => (
+                        <option key={db} value={db}>
+                          {db}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setActiveTab('manage')}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Go to Manage Databases
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>

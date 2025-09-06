@@ -8,9 +8,13 @@ interface SpacetimeDBContextValue {
   isConnected: boolean;
   tables: TableInfo[];
   connectionConfig: SpacetimeDBConfig | null;
+  currentDatabase: string | null;
+  availableDatabases: string[];
   connect: (config: SpacetimeDBConfig) => Promise<boolean>;
   disconnect: () => void;
-  refreshTables: () => Promise<void>;
+  switchDatabase: (databaseName: string) => Promise<void>;
+  refreshTables: (databaseName?: string) => Promise<void>;
+  refreshDatabases: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -21,6 +25,8 @@ export function SpacetimeDBProvider({ children }: { children: React.ReactNode })
   const [isConnected, setIsConnected] = useState(false);
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [connectionConfig, setConnectionConfig] = useState<SpacetimeDBConfig | null>(null);
+  const [currentDatabase, setCurrentDatabase] = useState<string | null>(null);
+  const [availableDatabases, setAvailableDatabases] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const connect = async (config: SpacetimeDBConfig): Promise<boolean> => {
@@ -34,9 +40,19 @@ export function SpacetimeDBProvider({ children }: { children: React.ReactNode })
         setConnectionConfig(config);
         setIsConnected(true);
         
-        // Load tables after successful connection
-        const tableList = await newClient.getTables();
-        setTables(tableList);
+        // Load available databases
+        const databases = await newClient.listDatabases();
+        setAvailableDatabases(databases);
+        
+        // If a specific database was provided, set it as current and load tables
+        if (config.database) {
+          setCurrentDatabase(config.database);
+          const tableList = await newClient.getTables(config.database);
+          setTables(tableList);
+        } else {
+          setTables([]);
+          setCurrentDatabase(null);
+        }
       }
       
       return connected;
@@ -53,19 +69,50 @@ export function SpacetimeDBProvider({ children }: { children: React.ReactNode })
     setIsConnected(false);
     setTables([]);
     setConnectionConfig(null);
+    setCurrentDatabase(null);
+    setAvailableDatabases([]);
   };
 
-  const refreshTables = async () => {
+  const switchDatabase = async (databaseName: string) => {
     if (!client) return;
     
     setIsLoading(true);
     try {
-      const tableList = await client.getTables();
+      setCurrentDatabase(databaseName);
+      const tableList = await client.getTables(databaseName);
+      setTables(tableList);
+    } catch (error) {
+      console.error('Failed to switch database:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const refreshTables = async (databaseName?: string) => {
+    if (!client) return;
+    
+    const dbName = databaseName || currentDatabase;
+    if (!dbName) return;
+    
+    setIsLoading(true);
+    try {
+      const tableList = await client.getTables(dbName);
       setTables(tableList);
     } catch (error) {
       console.error('Failed to refresh tables:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const refreshDatabases = async () => {
+    if (!client) return;
+    
+    try {
+      const databases = await client.listDatabases();
+      setAvailableDatabases(databases);
+    } catch (error) {
+      console.error('Failed to refresh databases:', error);
     }
   };
 
@@ -98,9 +145,13 @@ export function SpacetimeDBProvider({ children }: { children: React.ReactNode })
         isConnected,
         tables,
         connectionConfig,
+        currentDatabase,
+        availableDatabases,
         connect,
         disconnect,
+        switchDatabase,
         refreshTables,
+        refreshDatabases,
         isLoading,
       }}
     >

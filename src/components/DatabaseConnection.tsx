@@ -10,7 +10,7 @@ export function DatabaseConnection() {
   const [formData, setFormData] = useState({
     host: 'localhost',
     port: 3000,
-    database: 'spacetimedb',
+    database: '',
     token: '',
   });
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +22,7 @@ export function DatabaseConnection() {
     const config = {
       host: formData.host,
       port: parseInt(formData.port.toString()),
-      database: formData.database,
+      database: formData.database || undefined,
       token: formData.token || undefined,
     };
 
@@ -95,7 +95,7 @@ export function DatabaseConnection() {
 
           <div>
             <label htmlFor="database" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Database Name
+              Database Name <span className="text-gray-400">(optional)</span>
             </label>
             <input
               type="text"
@@ -104,9 +104,11 @@ export function DatabaseConnection() {
               value={formData.database}
               onChange={handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:text-white"
-              placeholder="spacetimedb"
-              required
+              placeholder="Leave empty to connect to server without selecting a database"
             />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Connect without a database name to manage multiple databases
+            </p>
           </div>
 
           <div>
