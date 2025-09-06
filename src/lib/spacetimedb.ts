@@ -1,6 +1,10 @@
 export interface SpacetimeDBConfig {
-  host: string;
-  port: number;
+  // URL-based connection
+  url?: string;
+  // Host/Port-based connection
+  host?: string;
+  port?: number;
+  // Common fields
   database?: string;
   token?: string;
 }
@@ -50,7 +54,22 @@ export class SpacetimeDBClient {
 
   constructor(config: SpacetimeDBConfig) {
     this.config = config;
-    this.baseUrl = `http://${config.host}:${config.port}`;
+    
+    if (config.url) {
+      // Use provided URL directly
+      this.baseUrl = config.url.endsWith('/') ? config.url.slice(0, -1) : config.url;
+    } else if (config.host && config.port) {
+      // Build URL from host and port
+      const isLocal = config.host.includes('localhost') || 
+                     config.host.includes('127.0.0.1') || 
+                     config.host.startsWith('192.168.') || 
+                     config.host.startsWith('10.') || 
+                     config.host.startsWith('172.');
+      const protocol = isLocal ? 'http' : 'https';
+      this.baseUrl = `${protocol}://${config.host}:${config.port}`;
+    } else {
+      throw new Error('Either url or both host and port must be provided');
+    }
   }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
@@ -70,9 +89,35 @@ export class SpacetimeDBClient {
   }
 
   async connect(): Promise<boolean> {
+    console.log(`Attempting to connect to SpacetimeDB at: ${this.baseUrl}`);
+    
     try {
-      const response = await this.makeRequest('/health');
-      return response.ok;
+      // Test connection by trying different endpoints
+      const endpoints = ['/databases', '/v1/databases', '/status', '/health'];
+      
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`Testing endpoint: ${this.baseUrl}${endpoint}`);
+          const response = await this.makeRequest(endpoint);
+          
+          console.log(`Endpoint ${endpoint} response:`, {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok
+          });
+          
+          if (response.ok) {
+            const data = await response.text();
+            console.log(`Connection successful via ${endpoint}:`, data);
+            return true;
+          }
+        } catch (endpointError) {
+          console.log(`Endpoint ${endpoint} failed:`, endpointError);
+          continue;
+        }
+      }
+      
+      return false;
     } catch (error) {
       console.error('Failed to connect to SpacetimeDB:', error);
       return false;
@@ -273,14 +318,35 @@ export class SpacetimeDBClient {
 
   async listDatabases(): Promise<string[]> {
     try {
-      const response = await this.makeRequest('/v1/databases');
+      // Try different possible endpoints for listing databases
+      const endpoints = ['/databases', '/v1/databases'];
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch databases: ${response.statusText}`);
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`Trying endpoint: ${this.baseUrl}${endpoint}`);
+          const response = await this.makeRequest(endpoint);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Database list response:', data);
+            
+            // Handle different response formats
+            if (Array.isArray(data)) {
+              return data.map(db => typeof db === 'string' ? db : db.name || db.identity);
+            }
+            if (data.databases && Array.isArray(data.databases)) {
+              return data.databases.map((db: any) => typeof db === 'string' ? db : db.name || db.identity);
+            }
+            
+            return [];
+          }
+        } catch (endpointError) {
+          console.log(`Endpoint ${endpoint} failed:`, endpointError);
+          continue;
+        }
       }
-
-      const data = await response.json();
-      return data.databases || [];
+      
+      throw new Error('All database listing endpoints failed');
     } catch (error) {
       console.error('Failed to fetch databases:', error);
       return [];

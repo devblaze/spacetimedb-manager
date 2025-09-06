@@ -7,7 +7,9 @@ import toast from 'react-hot-toast';
 
 export function DatabaseConnection() {
   const { connect, isLoading } = useSpacetimeDB();
+  const [connectionMode, setConnectionMode] = useState<'url' | 'host-port'>('host-port');
   const [formData, setFormData] = useState({
+    url: '',
     host: 'localhost',
     port: 3000,
     database: '',
@@ -19,32 +21,46 @@ export function DatabaseConnection() {
     e.preventDefault();
     setError(null);
 
-    const config = {
-      host: formData.host,
-      port: parseInt(formData.port.toString()),
-      database: formData.database || undefined,
-      token: formData.token || undefined,
-    };
+    const config = connectionMode === 'url' 
+      ? {
+          url: formData.url,
+          database: formData.database || undefined,
+          token: formData.token || undefined,
+        }
+      : {
+          host: formData.host,
+          port: parseInt(formData.port.toString()),
+          database: formData.database || undefined,
+          token: formData.token || undefined,
+        };
 
     try {
+      console.log('Attempting connection with config:', config);
       const success = await connect(config);
       if (success) {
         toast.success('Connected to SpacetimeDB successfully!');
       } else {
-        const errorMessage = 'Failed to connect to SpacetimeDB. Please check your configuration.';
+        const errorMessage = connectionMode === 'url' 
+          ? `Failed to connect to ${config.url}. Please check the URL and ensure SpacetimeDB is running.`
+          : `Failed to connect to ${config.host}:${config.port}. Please check the host, port, and ensure SpacetimeDB is running.`;
         setError(errorMessage);
         toast.error(errorMessage);
+        console.error('Connection failed with config:', config);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Connection failed';
       setError(errorMessage);
       toast.error(errorMessage);
+      console.error('Connection error:', err);
     }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ 
+      ...prev, 
+      [name]: name === 'port' ? parseInt(value) || 0 : value 
+    }));
     if (error) setError(null);
   };
 
@@ -59,39 +75,90 @@ export function DatabaseConnection() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Connection Mode Toggle */}
           <div>
-            <label htmlFor="host" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Host
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Connection Method
             </label>
-            <input
-              type="text"
-              id="host"
-              name="host"
-              value={formData.host}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:text-white"
-              placeholder="localhost"
-              required
-            />
+            <div className="flex rounded-md shadow-sm">
+              <button
+                type="button"
+                onClick={() => setConnectionMode('host-port')}
+                className={`px-4 py-2 text-sm font-medium rounded-l-md border ${
+                  connectionMode === 'host-port'
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-slate-600'
+                }`}
+              >
+                Host & Port
+              </button>
+              <button
+                type="button"
+                onClick={() => setConnectionMode('url')}
+                className={`px-4 py-2 text-sm font-medium rounded-r-md border-t border-b border-r ${
+                  connectionMode === 'url'
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-slate-600'
+                }`}
+              >
+                URL
+              </button>
+            </div>
           </div>
 
-          <div>
-            <label htmlFor="port" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Port
-            </label>
-            <input
-              type="number"
-              id="port"
-              name="port"
-              value={formData.port}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:text-white"
-              placeholder="3000"
-              required
-              min="1"
-              max="65535"
-            />
-          </div>
+          {connectionMode === 'url' ? (
+            <div>
+              <label htmlFor="url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                SpacetimeDB URL
+              </label>
+              <input
+                type="url"
+                id="url"
+                name="url"
+                value={formData.url}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:text-white"
+                placeholder="https://your-spacetimedb.example.com"
+                required
+              />
+            </div>
+          ) : (
+            <>
+              <div>
+                <label htmlFor="host" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Host
+                </label>
+                <input
+                  type="text"
+                  id="host"
+                  name="host"
+                  value={formData.host}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:text-white"
+                  placeholder="localhost"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="port" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Port
+                </label>
+                <input
+                  type="number"
+                  id="port"
+                  name="port"
+                  value={formData.port}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:text-white"
+                  placeholder="3000"
+                  required
+                  min="1"
+                  max="65535"
+                />
+              </div>
+            </>
+          )}
 
           <div>
             <label htmlFor="database" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

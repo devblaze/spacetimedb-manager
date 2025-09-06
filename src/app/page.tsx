@@ -49,7 +49,9 @@ export default function Home() {
                 </h1>
               </div>
               <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300">
-                <span>Connected to {connectionConfig?.host}:{connectionConfig?.port}</span>
+                <span>
+                  Connected to {connectionConfig?.url || `${connectionConfig?.host}:${connectionConfig?.port}`}
+                </span>
                 {currentDatabase ? (
                   <div className="flex items-center gap-2">
                     <span className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 rounded">

@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  spacetimedb-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - spacetimedb-network
+
+  # Optional: Include SpacetimeDB server for local development
+  # Uncomment if you want to run SpacetimeDB alongside the manager
+  # spacetimedb:
+  #   image: clockworklabs/spacetimedb:latest
+  #   ports:
+  #     - "3001:3000"  # SpacetimeDB HTTP API
+  #   environment:
+  #     - SPACETIMEDB_LOG_LEVEL=info
+  #   volumes:
+  #     - spacetimedb_data:/var/lib/spacetimedb
+  #   networks:
+  #     - spacetimedb-network
+
+networks:
+  spacetimedb-network:
+    driver: bridge
+
+# volumes:
+#   spacetimedb_data:
